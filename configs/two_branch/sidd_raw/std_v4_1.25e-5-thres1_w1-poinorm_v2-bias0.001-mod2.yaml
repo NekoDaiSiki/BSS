@@ -1,0 +1,108 @@
+task_name: std_v4_1.25e-5-thres1_w1-poinorm_v2_bias0.001-mod2
+train_url: ../AlphaSSDNModel/teacher/two_branch/sidd_raw # will join with task name in the phase option
+
+device: 'cuda:0' # 'cuda:0' or 'cpu'
+
+description: 'noise to clean'
+
+resume: 
+  path:  
+    teacher1:  [backbone,/home/hyq/workspace/AlphaSSDNModel/freq_supstd_resume/sidd_raw/freq_reg_soft_multiplier_0.1-1_2-0/w0.05-ws7-thres0.8_m0.999_clearcenter/ckpts/57.pth]
+    backbone:  [backbone,/home/hyq/workspace/AlphaSSDNModel/freq_supstd_resume/sidd_raw/freq_reg_soft_multiplier_0.1-1_2-0/w0.05-ws7-thres0.8_m0.999_clearcenter/ckpts/57.pth]
+ 
+  strict: true
+  resume_optim: false # 是否resume优化器
+
+datasets:
+  train:
+    type: DataLoader_SIDD_Medium_Raw_mod2 # the name of dataset class
+    data_dir: ../datasets/train/SIDD_Medium_Raw_noisy_sub512
+    patch: 256
+    batch_size: 4
+    
+  # may validate during training
+  validate:
+    type: Val_SIDD_Medium_Raw
+    # use kodak as default
+    data_dir: ../datasets/test/SIDD_raw_val
+    
+
+  # only work in testing
+  test:
+    type: Val_SIDD_Medium_Raw
+    # use kodak as default
+    data_dir: ../datasets/test/SIDD_raw_val
+
+
+
+
+models:
+  model_files:
+    - main_model.teacher
+    - backbone.unet
+    - module.masker
+    - module.noiser
+  
+  main_model: 
+    type: OneTeacher_TwoBranch_SIDDRaw
+
+
+  sub_models:
+    teacher1:
+      type: UNet
+      in_channels: 4
+      out_channels: 4
+      depth: 5
+      wf: 48
+      slope: 0.1
+
+    backbone:
+      type: UNet
+      in_channels: 4
+      out_channels: 4
+      depth: 5
+      wf: 48
+      slope: 0.1
+
+    noiser:
+      type: GauPos_Noiser
+      style: gauss5_50
+
+
+
+pretrain:
+  is_pretrain: false
+  pretrain_epoch: 1
+
+train:
+  mode: v4_stdmask_poinorm_v2
+  low_weight: 1
+  
+  total_epoch: 40
+  optim_models: [backbone]
+  save_freq: 1
+  print_freq: 100
+
+
+  optimizer:
+    type: Adam
+    lr: !!float 1.25e-5
+    weight_decay: !!float 1e-8
+
+  scheduler: 
+    milestones: [20]
+    gamma: 0.5
+
+  loss_params:
+    thres: 1
+    norm_bias: 0.001
+
+val:
+  is_val: true # a flag for validate during training  
+  repeat_times: 1
+  val_freq: 1
+  save_results: false
+
+test:
+  repeat_times: 1
+  save_results: true

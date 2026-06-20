@@ -1,0 +1,115 @@
+task_name: std_v4_7.5e-5-thres5_w1
+train_url: ../AlphaSSDNModel/teacher/two_branch/poi30 # will join with task name in the phase option
+
+device: 'cuda:0' # 'cuda:0' or 'cpu'
+
+description: 'noise to clean'
+
+resume: 
+  path:  
+    teacher1:  [anchor,/home/hyq/workspace/AlphaSSDNModel/freq_supstd_start_resume/poi30/freq_reg_soft_multiplier_5-1_30-0/w0.05-ws7-thres0.8_m0.999_clearcenter_V1/ckpts/59.pth]
+    backbone:  [anchor,/home/hyq/workspace/AlphaSSDNModel/freq_supstd_start_resume/poi30/freq_reg_soft_multiplier_5-1_30-0/w0.05-ws7-thres0.8_m0.999_clearcenter_V1/ckpts/59.pth]
+ 
+  strict: true
+  resume_optim: false # 是否resume优化器
+
+datasets:
+  train:
+    type: ImagenetValDataset # the name of dataset class
+    data_dir: ../datasets/train/Imagenet_val
+    patch: 128
+    batch_size: 4
+    
+  # may validate during training
+  validate:
+    type: BasicValidateDataset
+    # use kodak as default
+    data_dir: ../datasets/test/Kodak24
+    # data_dir: ../datasets/test/Set14
+    # data_dir: ../datasets/test/BSD300
+    
+
+  # only work in testing
+  test:
+    type: BasicValidateDataset
+    # use kodak as default
+    data_dir: ../datasets/test/Kodak24
+    # data_dir: ../datasets/test/Set14
+    # data_dir: ../datasets/test/BSD300
+
+
+
+
+models:
+  model_files:
+    - main_model.teacher
+    - backbone.unet
+    - module.masker
+    - module.noiser
+  
+  main_model: 
+    type: OneTeacher_TwoBranch
+
+
+  sub_models:
+    teacher1:
+      type: UNet
+      in_channels: 3
+      out_channels: 3
+      depth: 5
+      wf: 48
+      slope: 0.1
+
+    backbone:
+      type: UNet
+      in_channels: 3
+      out_channels: 3
+      depth: 5
+      wf: 48
+      slope: 0.1
+
+    noiser:
+      type: GauPos_Noiser
+      style: poisson30
+
+
+
+pretrain:
+  is_pretrain: false
+  pretrain_epoch: 1
+
+train:
+  mode: v4_stdmask
+  low_weight: 1
+  
+  total_epoch: 60
+  optim_models: [backbone]
+  save_freq: 1
+  print_freq: 100
+
+
+  optimizer:
+    type: Adam
+    lr: !!float 7.5e-5
+    weight_decay: !!float 1e-8
+
+  scheduler: 
+    milestones: [20,40]
+    gamma: 0.5
+
+  loss_params:
+    thres: 5
+    norm_type: poinorm
+    norm_weight: 1
+
+val:
+  is_val: true # a flag for validate during training  
+  repeat_times: 5
+  val_freq: 1
+  save_results: false
+
+test:
+  # repeat_times: 10
+  # repeat_times: 20
+  repeat_times: 3
+  save_results: true
