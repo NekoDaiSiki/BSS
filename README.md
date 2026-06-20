@@ -1,4 +1,5 @@
-# BSS
-code for BSS
+# Train
+run train.sh
 
-Comming Soon
+# Test
+run test.sh
