@@ -1,0 +1,106 @@
+# NSC-BSM SIDD raw-RGB, 60 epochs.
+task_name: sidd_raw
+train_url: ./exp/nsc-bsm
+device: cuda:0
+description: 'NSC-BSM SIDD raw, epochs 0-39 and 40-59'
+
+resume:
+  path: null
+  strict: true
+  resume_optim: true
+
+datasets:
+  train:
+    type: DataLoader_SIDD_Medium_Raw
+    data_dir: ./datasets/train/SIDD_Medium_Raw_noisy_sub512
+    patch: 256
+    batch_size: 4
+  validate:
+    type: Val_SIDD_Medium_Raw
+    data_dir: ./datasets/test/SIDD_raw_val
+  test:
+    type: Val_SIDD_Medium_Raw
+    data_dir: ./datasets/test/SIDD_raw_val
+
+models:
+  model_files:
+    - main_model.freq_prior_siddraw
+    - backbone.unet
+    - module.masker
+  main_model:
+    type: Frequency_B2UB_Model_SupStd_AnchorMomentum
+    m: 0.999
+  sub_models:
+    anchor:
+      type: UNet
+      in_channels: 4
+      out_channels: 4
+      depth: 5
+      wf: 48
+      slope: 0.1
+    backbone:
+      type: UNet
+      in_channels: 4
+      out_channels: 4
+      depth: 5
+      wf: 48
+      slope: 0.1
+    masker:
+      type: b2ub_Masker
+      width: 4
+      mode: interpolate
+      mask_type: all
+
+train:
+  total_epoch: 60
+  optim_models: [backbone]
+  save_freq: 1
+  print_freq: 100
+  # end_epoch is exclusive. Continue from the epoch-39 state at epoch 40.
+  # The mean-loss weight grows from 0.05 at epoch 40 to 1.0 at epoch 59.
+  mean_loss_stages:
+    - start_epoch: 0
+      end_epoch: 40
+      weight: 0.0
+      ws: 7
+      lower: 0.1
+    - start_epoch: 40
+      end_epoch: 60
+      weight: 0.0
+      weight_end: 1.0
+      ws: 7
+      lower: 0.0
+  optimizer:
+    type: Adam
+    lr: !!float 1e-4
+    weight_decay: !!float 1e-8
+  scheduler:
+    milestones: [25, 35, 45, 55]
+    gamma: 0.5
+  clear_center: false
+  loss_params:
+    thread1: 40
+    thread2: 60
+    alpha: 1.0
+    beta: 2
+    increase_ratio: 20
+    mode: freq_reg_soft_multiplier
+    lower: 0.1
+    mullower: 1
+    upper: 3  # T_t: textured-region threshold on the 0-255 proxy scale
+    mulupper: 0
+    mean_loss_params:
+      weight: 0.0
+      mean_ws: 3  # predicted-value neighborhood mean (k)
+      ws: 7       # flat-region selection
+      thres: 1  # T_f: flat-region threshold on the 0-255 proxy scale
+
+val:
+  is_val: true
+  repeat_times: 1
+  val_freq: 1
+  save_results: false
+
+test:
+  repeat_times: 1
+  save_results: true

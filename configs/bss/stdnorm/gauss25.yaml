@@ -1,0 +1,79 @@
+# Run from coding/. Uses the existing separator checkpoint.
+task_name: gauss25
+train_url: ./exp/bss-stdnorm
+device: cuda:0
+description: 'BSS with per-image variance matching: gauss25'
+resume:
+  path:
+    teacher1:
+    - anchor
+    - ./exp/nsc-bsm/gauss25/ckpts/56.pth
+    backbone:
+    - anchor
+    - ./exp/nsc-bsm/gauss25/ckpts/56.pth
+  strict: true
+  resume_optim: false
+datasets:
+  train:
+    type: ImagenetValDataset
+    data_dir: ./datasets/train/Imagenet_val
+    patch: 128
+    batch_size: 4
+  validate:
+    type: BasicValidateDataset
+    data_dir: ./datasets/test/Kodak24
+  test:
+    type: BasicValidateDataset
+    data_dir: ./datasets/test/Kodak24
+models:
+  model_files:
+  - main_model.teacher_stdnorm
+  - backbone.unet
+  - module.noiser
+  main_model:
+    type: OneTeacher_TwoBranch_StdNorm
+  sub_models:
+    teacher1:
+      type: UNet
+      in_channels: 3
+      out_channels: 3
+      depth: 5
+      wf: 48
+      slope: 0.1
+    backbone:
+      type: UNet
+      in_channels: 3
+      out_channels: 3
+      depth: 5
+      wf: 48
+      slope: 0.1
+    noiser:
+      type: GauPos_Noiser
+      style: gauss25
+train:
+  mode: v4_stdmask_stdnorm
+  total_epoch: 60
+  optim_models:
+  - backbone
+  save_freq: 1
+  print_freq: 100
+  optimizer:
+    type: Adam
+    lr: 7.5e-05
+    weight_decay: 1.0e-08
+  scheduler:
+    milestones:
+    - 20
+    - 40
+    gamma: 0.5
+  loss_params:
+    thres: 5
+    ws: 7
+val:
+  is_val: true
+  repeat_times: 10
+  val_freq: 1
+  save_results: false
+test:
+  repeat_times: 10
+  save_results: true

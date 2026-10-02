@@ -1,0 +1,74 @@
+task_name: sidd_raw
+train_url: ../exp/BSS
+device: cuda:0
+description: 'BSS with a SIDD raw-RGB NSC-BSM separator'
+
+resume:
+  path:
+    teacher1: [anchor, ./exp/nsc-bsm/sidd_raw/ckpts/57.pth]
+    backbone: [anchor, ./exp/nsc-bsm/sidd_raw/ckpts/57.pth]
+  strict: true
+  resume_optim: false
+
+datasets:
+  train:
+    type: DataLoader_SIDD_Medium_Raw_mod2
+    data_dir: ./datasets/train/SIDD_Medium_Raw_noisy_sub512
+    patch: 256
+    batch_size: 4
+  validate:
+    type: Val_SIDD_Medium_Raw
+    data_dir: ./datasets/test/SIDD_raw_val
+  test:
+    type: Val_SIDD_Medium_Raw
+    data_dir: ./datasets/test/SIDD_raw_val
+
+models:
+  model_files:
+    - main_model.teacher
+    - backbone.unet
+  main_model:
+    type: OneTeacher_TwoBranch_SIDDRaw
+  sub_models:
+    teacher1:
+      type: UNet
+      in_channels: 4
+      out_channels: 4
+      depth: 5
+      wf: 48
+      slope: 0.1
+    backbone:
+      type: UNet
+      in_channels: 4
+      out_channels: 4
+      depth: 5
+      wf: 48
+      slope: 0.1
+
+train:
+  mode: v4_stdmask_poinorm_v2
+  total_epoch: 40
+  optim_models: [backbone]
+  save_freq: 1
+  print_freq: 100
+  optimizer:
+    type: Adam
+    lr: !!float 1.25e-5
+    weight_decay: !!float 1e-8
+  scheduler:
+    milestones: [20]
+    gamma: 0.5
+  loss_params:
+    thres: 1
+    ws: 7
+    norm_bias: 0.01
+
+val:
+  is_val: true
+  repeat_times: 1
+  val_freq: 1
+  save_results: false
+
+test:
+  repeat_times: 1
+  save_results: true

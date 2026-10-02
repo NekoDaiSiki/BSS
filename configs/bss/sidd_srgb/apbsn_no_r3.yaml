@@ -1,0 +1,94 @@
+# SIDD sRGB BSS with AP-BSN. Place APBSN_SIDD.pth under ./ckpt/apbsn/.
+task_name: apbsn_no_r3
+train_url: ./exp/bss/sidd_srgb
+device: cuda:0
+description: 'Frozen AP-BSN teacher without R3; non-blind student initialized from AP-BSN'
+
+resume:
+  path:
+    teacher1: [model_weight.denoiser, ./ckpt/apbsn/APBSN_SIDD.pth]
+    backbone: [model_weight.denoiser, ./ckpt/apbsn/APBSN_SIDD.pth]
+  strict: true
+  resume_optim: false
+
+datasets:
+  train:
+    type: SIDDSrgbTrainDataset_crop
+    patch_size: 128
+    pin_memory: false
+    dataset_path: ./datasets/SIDD
+    batch_size: 4
+    pairing: random
+  validate:
+    type: SIDDSrgbValidationDataset
+    data_dir: ./datasets/SIDD
+  test:
+    type: SIDDSrgbValidationDataset
+    data_dir: ./datasets/SIDD
+
+models:
+  model_files:
+    - main_model.teacher_srgb_apbsn
+    - backbone.apbsn
+  main_model:
+    type: OneTeacher_TwoBranch_SIDDsrgb_SA
+  sub_models:
+    teacher1:
+      type: APBSNTeacher
+      pd_a: 5
+      pd_b: 2
+      pd_pad: 2
+      R3: false
+      bsn: DBSNl
+      in_ch: 3
+      bsn_base_ch: 128
+      bsn_num_module: 9
+      forward_mode: denoise
+      frozen: true
+      force_eval: true
+    backbone:
+      type: APBSNBackbone
+      blindspot: false  # Learn center connections in the final denoiser.
+      pd_a: 5
+      pd_b: 2
+      pd_pad: 2
+      R3: false
+      bsn: DBSNl
+      in_ch: 3
+      bsn_base_ch: 128
+      bsn_num_module: 9
+      forward_mode: auto
+      train_forward_mode: forward
+      eval_forward_mode: denoise
+
+train:
+  mode: v4_stdmask_poinorm_v2
+  total_epoch: 40
+  optim_models: [backbone]
+  save_freq: 1
+  print_freq: 100
+  optimizer:
+    type: Adam
+    lr: !!float 1.25e-5
+    weight_decay: !!float 1e-8
+  scheduler:
+    milestones: [20]
+    gamma: 0.5
+  loss_params:
+    thres: 1
+    ws: 7
+    norm_bias: 0.01
+
+val:
+  is_val: true
+  repeat_times: 1
+  val_freq: 1
+  save_results: false
+  quantize_metric: false
+  ssim_mode: y_channel
+
+test:
+  repeat_times: 1
+  save_results: true
+  quantize_metric: true
+  ssim_mode: rgb
